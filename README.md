@@ -6,7 +6,7 @@ The code in the R folder can be run on R Studio, all required packages are loade
 Bash scripts were designed for a HPC and any required packages were loaded in via bioconda and a conda enviroment at the start of each script
 Python scripts can be run on the HPC using the Bash scripts of the same name
 
-## Usage
+## Usage (View in Raw)
 The workflow is as follows:
 
 	RNASeq pre-processing													Microarray pre-processing
@@ -47,7 +47,7 @@ The workflow is as follows:
 																	    |
 																     Meta_analysis
 
-## Directory structure
+## Directory structure (View in Raw)
 
 Dissertation
 	|
