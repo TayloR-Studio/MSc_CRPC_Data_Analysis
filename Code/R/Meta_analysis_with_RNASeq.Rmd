@@ -1,0 +1,339 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+#Load in needed packages
+library(tidyverse)
+library(here)
+library(MetaIntegrator)
+library(enrichR)
+```
+
+```{r}
+#List of all the studies being used in this meta analysis, split by type of study and then combined
+microarry <- c('GSE2443', 'GSE3325', 'GSE28403', 'GSE32269', 'GSE32982', 'GSE37199')
+RNASeq <- ('GSE80609')
+studies <- c(microarry, RNASeq)
+
+#For each item in the study list
+for (i in studies){
+  #Download the saved data files and attach to relevant variable name
+  table_name <- paste('study', i, sep = '')
+  assign(table_name, (read_csv(here(paste('Data/count_', i, '.csv', sep = '')))))
+}
+
+#Add the loaded in tables to lists depending on type of study
+microarry_tables <- list(studyGSE2443, studyGSE3325, studyGSE28403, studyGSE32269, studyGSE32982, studyGSE37199)
+RNASeq_tables <- list(studyGSE80609)
+```
+
+```{r}
+#Add the microarry and RNASeq tables to one list
+count_tables <- c(microarry_tables, RNASeq_tables)
+```
+
+```{r}
+#For each of the studies
+for (a in 1:length(studies)){
+  #Convert the tables from a tibble to a data frame so row names can be added
+  count_tables[[a]] <- as.data.frame(count_tables[[a]])
+  #Turn the first column (gene IDs) into row names
+  rownames(count_tables[[a]]) <- count_tables[[a]][,1]
+  #Remove the gene IDs column so now the data frame just contains numerical data and string 
+  count_tables[[a]] <- count_tables[[a]][,-1]
+}
+```
+
+```{r}
+#creating metaintegrator list
+
+#For each of the studies in the list
+for (b in studies){
+  #Download the relevant phenotype data to the relevant variable name
+  table_name <- paste('pheno', b, sep = '')
+  assign(table_name, read_csv(here(paste('Data/', b, '/', b, '.csv', sep = ''))))
+}
+
+#Add the phenotype tables to a list
+pheno_tables <- list(phenoGSE2443, phenoGSE3325, phenoGSE28403, phenoGSE32269, phenoGSE32982, phenoGSE37199, phenoGSE80609)
+
+#For each of the studies
+for (c in 1:length(studies)){
+  #To the phenotype file files
+  pheno_tables[[c]] <- pheno_tables[[c]] %>% 
+    #Create a column turning the status' into factors - 0 = hormone sensitive PC, 1 = CRPC
+    mutate(condition = case_when(Status == 'CRPC' ~ 1,
+                                 Status == 'hormone_sensitive_PCA' ~ 0,
+                                 Status == 'Prostate cancer' ~ 0)) %>% 
+    #Move to after the the status in each table to double checking it all worked
+    relocate(condition, .after = Status)
+}
+
+#For each study
+for (d in 1:length(studies)){
+  #Pull the names of each sample from each study using the phenotype data and assign to the relevant variable name
+  sample_names <- (paste('sample_names', studies[d], sep = ''))
+  assign(sample_names, pheno_tables[[d]]$ID)
+}
+
+#Nest all of the sample name lists under one list
+sample_names_list <- list(sample_namesGSE2443, sample_namesGSE3325, sample_namesGSE28403, sample_namesGSE32269, sample_namesGSE32982, sample_namesGSE37199, sample_namesGSE80609)
+
+#For each study
+for (e in 1:length(studies)){
+  #For each sample from the relevant study
+  for (f in 1:length(sample_names_list[[e]])){
+    #Set it to the name of each column in the table so now the data and phenotype data have matching sample names
+    colnames(count_tables[[e]])[f] <- sample_names_list[[e]][f]
+  }
+}
+
+#For each study
+for (g in 1:length(studies)){
+  #Turn the data frames into a matrix now the formatting is done
+  count_tables[[g]] <- as.matrix(count_tables[[g]])
+}
+
+#For each of the studies
+for (h in 1:length(studies)){
+  #Turn the phenotype tables into a data frame
+  pheno_tables[[h]] <- as.data.frame(pheno_tables[[h]])
+  #Ensure the sample name column for the phenotype data is the first column
+  pheno_tables[[h]] <- relocate(pheno_tables[[h]], ID)
+  #Turn the first column (now definitely the sample names)
+  rownames(pheno_tables[[h]]) <- pheno_tables[[h]][,1]
+  #Remove the sample name column now it is the row names
+  pheno_tables[[h]] <- pheno_tables[[h]][,-1]
+}
+
+#For each study
+for (i in 1:length(studies)){
+  #Assigns the name for the ID data set
+  formattedName <- paste('Study: ', studies[i], sep = '')
+  #Assigns the class as being the numerical data in the phenotype data and the sample names
+  class <- setNames(pheno_tables[[i]]$condition, colnames(count_tables[[i]]))
+  #Assigns the count tables to be the expression data
+  expr <- count_tables[[i]]
+  #Assigns the phenotype data to be... the phenotype data
+  pheno <- pheno_tables[[i]]
+  #Pulls the gene symbol row names from the count tables for the gene symbols/keys
+  gene_sym <- rownames(count_tables[[i]])
+  keys <- setNames(gene_sym, rownames(count_tables[[i]]))
+  
+  #Creates the ID data set using all of these values for each study and assigns it to the relevant variable name
+  ID_names <- paste('ID_', studies[i], sep = '')
+  assign(ID_names, list(formattedName = formattedName, class = class, expr = expr, pheno = pheno, keys = keys))
+}
+
+#Adds all the ID data sets to one list
+ID_list <- list(ID_GSE2443, ID_GSE3325, ID_GSE28403, ID_GSE32269, ID_GSE32982, ID_GSE37199, ID_GSE80609)
+
+#For each item in the ID list
+for (j in ID_list){
+  #Confirm that the item is a valid data set
+  print(checkDataObject(j, "Dataset"))
+}
+```
+
+```{r}
+#Names the data sets with the formatted names created earlier
+names(ID_list) = c(ID_GSE2443$formattedName, ID_GSE3325$formattedName, ID_GSE28403$formattedName, ID_GSE32269$formattedName, ID_GSE32982$formattedName, ID_GSE37199$formattedName, ID_GSE80609$formattedName)
+
+#Creates an empty meta object 
+MetaObj=list()
+#Adds all of the ID data to the meta object
+MetaObj$originalData <- ID_list
+#Checks that the meta object is a valid object
+checkDataObject(MetaObj, "Meta", "Pre-Analysis")
+#Does gene symbol correction on the updated meta object
+finalll<-geneSymbolCorrection(MetaObj)
+#Runs the meta analysis on the meta data
+sMetaObj <- runMetaAnalysis(finalll,maxCores = 1)
+```
+
+```{r}
+#Filters the meta analysis results at FDR = 0.05 (p correction)
+leMetaAnalysis <- filterGenes(sMetaObj, isLeaveOneOut = F, FDRThresh = 0.05)
+```
+
+```{r}
+#Identifies the significantly up or down regulated genes and assigns them to a list, which then gets saved as a csv file
+up <- leMetaAnalysis[["filterResults"]][["FDR0.05_es0_nStudies1_looaFALSE_hetero0"]][["posGeneNames"]]
+down <- leMetaAnalysis[["filterResults"]][["FDR0.05_es0_nStudies1_looaFALSE_hetero0"]][["negGeneNames"]]
+
+write.csv(up,"filteredup_all.csv")
+write.csv(down,"filtereddown_all.csv")
+
+file.rename(from = (here('Code/filteredup_all.csv')), to = (here('Data/filteredup_all.csv')))
+file.rename(from = (here('Code/filtereddown_all.csv')), to = (here('Data/filtereddown_all.csv')))
+```
+
+```{r}
+#Sets the max time for processes to take before timing out
+options(timeout = max(600, getOption("timeout")))
+
+#Copies the meta analysis so one can be edited without loosing the data
+h <- leMetaAnalysis
+
+#Creates a list of three drug data sets - CP = drugs; SH = shRNA; LIG = ligands, to loop through
+drug_datasets <- c('CP', 'SH', 'LIG')
+
+#For each othe data set types
+for (k in drug_datasets){
+  #Identify any significant drugs, produce a graph and assign to separate variables
+  drug_result <- paste('lincsHits_', k, sep = '')
+  assign(drug_result, lincsCorrelate(metaObject = h, filterObject = h$filterResults[[1]], dataset = k, direction = "reverse", cor.method = "pearson"))
+}
+```
+
+```{r}
+#Ensures the website for these data bases is loaded
+websiteLive <- TRUE
+
+#Creates a list of the data bases to loop through
+dbs <- c("GO_Biological_Process_2025", "GO_Cellular_Component_2025", "GO_Molecular_Function_2025")
+#Creates a list of shorter names for the data bases
+dbs_name <- c("BP", "CC", "MF")
+
+#Creates a list of just the significantly up or down regulated genes
+gene_reg <- list(h$filterResults[[1]]$posGeneNames, h$filterResults[[1]]$negGeneNames)
+#Creates a list of up or down regulation names
+gene_reg_name <- c('pos', 'neg')
+
+#If the data base website is loaded
+if (websiteLive) {
+  #For each data base
+  for (l in 1:3){
+    #For each up/down regulation
+    for (m in 1:2){
+      #Run the gene set enrichment analysis on each combination of data base & gene regulation
+      gene_set_result <- paste('enriched', dbs_name[l], gene_reg_name[m], sep = '_')
+      assign(gene_set_result, enrichr(gene_reg[[m]], dbs[l]))
+    }
+  }
+  }
+
+#Assigns each gene set enrichment result to a list
+enriched <- list(enriched_BP_pos, enriched_BP_neg, enriched_CC_pos, enriched_CC_neg, enriched_MF_pos, enriched_MF_neg)
+#Adjusts the list a little so it can be used for plotting
+enriched_plot <- list(enriched[[1]]$GO_Biological_Process_2025, enriched[[2]]$GO_Biological_Process_2025, enriched[[3]]$GO_Cellular_Component_2025, enriched[[4]]$GO_Cellular_Component_2025, enriched[[5]]$GO_Molecular_Function_2025, enriched[[6]]$GO_Molecular_Function_2025)
+
+#For each gene set result
+for (n in 1:6){
+  #Create a name for the plot result
+  plot_name <- paste('plot_', n, sep = '') 
+  #If the data base website is live
+  if (websiteLive){
+    #Use the gene set enrichment data to make graphs
+    assign(plot_name, plotEnrich(enriched_plot[[n]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value"))
+  }
+  }
+
+#Add all the graphs to a list
+plot_list <- list(plot_1, plot_2, plot_3, plot_4, plot_5, plot_6)
+```
+
+```{r}
+#Data Validation
+
+#Pulls in the normalised data that will be used for validation
+studyGSE197609 <- read.csv(here('Data/GSE197609_fpkm_norm_gene_counts.csv.gz')) %>% 
+  #Makes the gene names into the row names
+  column_to_rownames('Gene_ID') %>% 
+  #Filters down to just the samples wanted
+  select(c(H.1153640, H.1404067, H.214884, H.2478651, H.3350550, H.3713894, H.6259, H.96144785))
+
+#Pulls in the phenotype data
+phenoGSE197609 <- read_csv(here(paste('Data/GSE197609/GSE197609.csv')))
+
+#Edits the phenotype data so the status is numerical
+phenoGSE197609 <- phenoGSE197609 %>% 
+  mutate(condition = case_when(Status == 'CRPC' ~ 1,
+                               Status == 'hormone_sensitive_PCA' ~ 0))
+
+#Pulls the sample names from the phenotype data
+sample_namesGSE197609 <- phenoGSE197609$ID
+
+#Adds these sample names to the expression data so it all matches
+for (o in 1:length(sample_namesGSE197609)){
+  colnames(studyGSE197609)[o] <- sample_namesGSE197609[o]
+  }
+
+#Now the expression data is done being edited, turn it into a matrix
+studyGSE197609 <- as.matrix(studyGSE197609)
+
+#Turn the phenotype data into a data frame so it can have row names
+phenoGSE197609 <- as.data.frame(phenoGSE197609)
+#Move the ID column to the start
+phenoGSE197609 <- relocate(phenoGSE197609, ID)
+#Turn the first column (now the sample IDs) into the row names
+rownames(phenoGSE197609) <- phenoGSE197609[,1]
+#Removes the first column (the IDs)
+phenoGSE197609 <- phenoGSE197609[,-1]
+
+#Setting up an ID data set for the validation data
+
+#Creates a name for the data
+formattedName <- 'Study: GSE197609'
+#Assigns the class as being the numerical data in the phenotype data and the sample names
+class <- setNames(phenoGSE197609$condition, colnames(studyGSE197609))
+#Assigns the count tables to be the expression data
+expr <- studyGSE197609
+#Assigns the phenotype data to be... the phenotype data
+pheno <- phenoGSE197609
+#Pulls the gene symbol row names from the count tables for the gene symbols/keys
+gene_sym <- rownames(studyGSE197609)
+keys <- setNames(gene_sym, rownames(studyGSE197609))
+
+#Creates the ID data set using all of these values assigns it to the relevant variable name
+ID_GSE197609 <- list(formattedName = formattedName, class = class, expr = expr, pheno = pheno, keys = keys)
+```
+
+
+
+
+```{r}
+#Creates the violin plot comparing the meta analysis data set to the validation data set
+violinPlot(leMetaAnalysis$filterResults$FDR0.05_es0_nStudies1_looaFALSE_hetero0, ID_GSE197609, labelColumn = 'Status')
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

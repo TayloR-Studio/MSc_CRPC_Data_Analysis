@@ -1,0 +1,529 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+#Load in packages needed
+library(GEOquery)
+library(oligo)
+library(tidyverse)
+library(here)
+library(data.table)
+library(hgu133plus2.db)
+library(hgu133a.db)
+library(sva)
+```
+
+```{r}
+#List of all study names for iterating through
+study <- c("GSE3325", "GSE2443", "GSE32269", "GSE32982", "GSE37199", "GSE28403")
+```
+
+```{r}
+#Creates an empty to nest further empty lists
+CEL_path_list <- list()
+
+#Iterates through the list of studies
+for (a in study){
+  #Adds the study names to 'celfiles' to name the nested list items
+  CEL_path <- paste('celfiles', a, sep = '')
+  #Adds the nested list names to the top level list
+  CEL_path_list <- append(CEL_path_list, CEL_path)
+}
+```
+
+#DO NOT RUN AGAIN#
+
+```{r eval=FALSE, include=FALSE}
+#Sets the max time for processes to take before timing out
+options(timeout = max(600, getOption("timeout")))
+
+#For each item in the study list
+for (i in study){
+  
+  #Assign the directory location for each microarray raw data file
+  tar_direct <- paste(i, '/', i, '_RAW.tar', sep = '')
+  #Assigns the directory for the cel files
+  CEL_direct <- paste(i, '/CEL', sep = '')
+  #Assigns the directory where the code is and therefore the downloaded files will be
+  file_origin <- paste('Code/', i, sep = '')
+  #Assigns the directory where the data should be moved to & stored
+  file_destin <- paste('Data/', i, sep = '')
+  
+  #Downloads the files for the study currently being used in this loop
+  getGEOSuppFiles(i)
+  
+  #Unpacks the downloaded files into the assigned directories
+  untar(tar_direct, exdir = CEL_direct)
+  
+  #Moves the downloaded files from the code directory to the data directory
+  file.rename(from=(here(file_origin)), to=(here(file_destin)))
+  }
+```
+
+#At this point, filter out the downloaded CEL files based on inclusion/exclusion criteria
+
+```{r}
+#Empty list for adding the cel files to
+celfiles <- list()
+
+#For each of the studies
+for (c in 1:length(study)){
+  #Assign cel file directories to a variable
+  sub_file_destin <- paste('Data/', study[c], '/CEL', sep = '')
+  #Use the cel file directories variable to create a list of all cel file directories  
+  celfiles[[c]] <- list.files(here(sub_file_destin), full = TRUE)
+}
+
+#Add the previously created cel list names to the list of directories
+names(celfiles) <- CEL_path_list
+```
+
+```{r}
+#For each study in the list
+for (s in study){
+  #Assign the phenotype file directory for the study currently active in the loop
+  pheno_file_path <- paste('Data/', s, '/', s, '.csv', sep = '')
+  #Assign the variable name for the phenotype table
+  pheno_table <- paste(s, '_pheno', sep = '')
+  #Use the created phenotype directory to download the phenotype table and assign it to the unique name for this loop
+  assign(pheno_table, read_csv(here(pheno_file_path)))
+  }
+
+#Assign all the phenotype tables to a list that can be iterated over later
+pheno_files <- list(GSE3325_pheno, GSE2443_pheno, GSE32269_pheno, GSE32982_pheno, GSE37199_pheno, GSE28403_pheno)
+
+#For each of the 6 studies
+for (p in 1:length(study)){
+  #Assign name for the Annotated Data Frame for each study
+  SDRF_name <- paste(study[p], '_SDRF', sep = '')
+  #Creates the annotated data frame with the phenotype table for the relevant study
+  assign(SDRF_name, AnnotatedDataFrame(pheno_files[[p]]))
+  }
+
+#Assigns the annotated data frames to a list that can be iterated over later
+SDRF_files <- list(GSE3325_SDRF, GSE2443_SDRF, GSE32269_SDRF, GSE32982_SDRF, GSE37199_SDRF, GSE28403_SDRF)
+
+#For each study
+for (b in 1:length(study)){
+  #Create an expression feature set with the relevant cel files and phenotype data
+  assign(study[b], read.celfiles(celfiles[b],phenoData = SDRF_files[[b]]))
+}
+
+#Assigns all the expression feature sets to a list that can be iterated over later
+study_data <- list(GSE3325, GSE2443, GSE32269, GSE32982, GSE37199, GSE28403)
+```
+
+```{r}
+#check the data through principle components analysis and boxplots
+
+#For each study
+for (d in 1:length(study)){
+  
+  #Pulls the expression count values and logarithmic (base 2) values of these
+  exp_raw <- log2(Biobase::exprs(study_data[[d]]))
+  #Calculates PCA values
+  PCA_raw <- prcomp(t(exp_raw), scale. = FALSE)
+  
+  #Calculates the percentage for each sample using the standard deviation values made during the PCA calculations
+  percentVar <- round(100*PCA_raw$sdev^2/sum(PCA_raw$sdev^2),1)
+  #Calculates the standard deviation ratio using the first two standard deviation values
+  sd_ratio <- sqrt(percentVar[2]/percentVar[1])
+  
+  #Builds a PCA data frame using the PCA values and disease status from the phenotype data
+  dataGG <- data.frame(PC1 = PCA_raw$x[,1], PC2 = PCA_raw$x[,2],
+                     Disease = study_data[[d]]@phenoData@data[["Status"]]
+  )
+
+  #Produces a PCA graph to visualize the data using the PCA data frame
+  print(ggplot(dataGG, aes(PC1, PC2)) +
+          #Assigns the two groups for the PCA to be distinguished by shape & colour
+          geom_point(aes(shape = Disease, colour = Disease)) +
+          #Titles the plot, including with the Study name in order to identify which PCA comes from each one
+          ggtitle(paste("PCA plot of the log-transformed raw expression\ndata for study:", study[d])) +
+          #Labels the x & y axis, including with the percentage values
+          xlab(paste0("PC1, VarExp: ", percentVar[1], "%")) +
+          ylab(paste0("PC2, VarExp: ", percentVar[2], "%")) +
+          #Centers the title on the graph
+          theme(plot.title = element_text(hjust = 0.5))+
+          #Sets the ratio of x to y axis spaces
+          coord_fixed(ratio = sd_ratio))
+  }
+```
+
+```{r}
+#check if there are any outliers
+
+#For each study
+for (e in 1:length(study)){
+  #Create a boxplot displaying the study data
+  print(oligo::boxplot(study_data[[e]], target = "core", 
+                       #Set the title including the name of each study so it can be identified which box plot is showing which studies data
+                       main = paste("Boxplot of log2-intensitites for the raw data for study:", study[[e]])))
+  }
+```
+
+```{r}
+#normalization then checking the data again through pca and boxplots to check any outliers
+
+#For each study
+for (f in 1:length(study)){
+  #Assigns the variable name for the normalised data
+  norm_files <- paste(study[f], '_norm', sep = '')
+  #Normalises the data and assigns it to the set variable
+  assign(norm_files, oligo::rma(study_data[[f]]))
+}
+
+#Adds all the normalised data to a list
+norm_list <- list(GSE3325_norm, GSE2443_norm, GSE32269_norm, GSE32982_norm, GSE37199_norm, GSE28403_norm)
+
+#For each study
+for (g in 1:length(study)){
+  
+  #Pulls the expression count values, log2 not needed as was done using the rma function
+  exp <- Biobase::exprs(norm_list[[g]])
+  #Calculates PCA values
+  PCA <- prcomp(t(exp), scale = FALSE)
+  
+  #Calculates the percentage for each sample using the standard deviation values made during the PCA calculations
+  percentVar <- round(100*PCA$sdev^2/sum(PCA$sdev^2),1)
+  #Calculates the standard deviation ratio using the first two standard deviation values
+  sd_ratio <- sqrt(percentVar[2] / percentVar[1])
+  
+  #Builds a PCA data frame using the PCA values and disease status from the phenotype data
+  dataGG <- data.frame(PC1 = PCA$x[,1], PC2 = PCA$x[,2],
+                       Disease = Biobase::pData(norm_list[[g]])$Status)
+  
+  #Produces a PCA graph to visualize the data using the PCA data frame
+  print(ggplot(dataGG, aes(PC1, PC2)) +
+          #Assigns the two groups for the PCA to be distinguished by shape & colour
+          geom_point(aes(shape = Disease, colour = Disease)) +
+          #Titles the plot, including with the Study name in order to identify which PCA comes from each one
+          ggtitle(paste("PCA plot of the calibrated, summarized data\nfor study:", study[g])) +
+          #Labels the x & y axis, including with the percentage values
+          xlab(paste0("PC1, VarExp: ", percentVar[1], "%")) +
+          ylab(paste0("PC2, VarExp: ", percentVar[2], "%")) +
+          #Centers the title on the graph
+          theme(plot.title = element_text(hjust = 0.5)) +
+          #Sets the ratio of x to y axis spaces
+          coord_fixed(ratio = sd_ratio))
+  
+  #Create a boxplot displaying the study data
+  print(oligo::boxplot(norm_list[[g]], target = "core",
+                       #Set the title including the name of each study so it can be identified which box plot is showing which studies data
+                       main = paste("Boxplot of log2-intensitites for the calibrated,\nsummarized data for study:", study[g])))
+  }
+
+```
+
+```{r}
+#filtering low-intensity genes
+
+#For each study
+for (h in 1:length(study)){
+  #Calculates expression values and the median of each row
+  study_f <- rowMedians(Biobase::exprs(norm_list[[h]]))
+  
+  #Produces a histogram of the normalised median expression data with a title identifying which study it is from and and an x axis label
+  print(hist_res <- hist(study_f, 100, col="#e7efd8", freq = FALSE,
+                         main = paste("Histogram of the median intensities", study[h]),
+                         xlab = "Median intensities"))
+  
+  #For each of the break values, identify the maximum density value
+  emp_mu <- hist_res$breaks[which.max(hist_res$density)]
+  #Calculates the standard deviation
+  emp_sd <- mad(study_f)/2
+  #Sets the prop_central value to 0.5
+  prop_cental <- 0.50
+  
+  #Produce another histogram with the same settings but also a line for the maximum density values and standard deviations
+  print(try(hist(study_f, 100, col="#e7efd8", freq = FALSE,
+                 main = paste("Histogram of the median intensities", study[h]),
+                 xlab = "Median intensities") +
+              lines(sort(study_f), prop_cental*dnorm(sort(study_f), mean = emp_mu , sd = emp_sd), col = "grey10", lwd = 4)))
+  
+  #Median threshold calculation
+  thresh_median <- qnorm(0.05 / prop_cental, emp_mu, emp_sd)
+  #Calculates the number of samples in each category
+  no_of_samples <- table(paste0(pData(norm_list[[h]])$Status))
+  #Displays the number of samples
+  no_of_samples
+  #Works out the smallest number of samples between the two groups
+  samples_cutoff <- min(no_of_samples)
+  
+  #Identifies if the data has been sufficiently processed
+  idx_thresh_median <- apply(exprs(norm_list[[h]]), 1, function(x){
+    sum(x > thresh_median) >= samples_cutoff})
+  
+  #Displays the results of this checking
+  print(table(idx_thresh_median))
+  }
+```
+
+```{r}
+#There is no needed filtration if the results of the last line did not show any outlier - outlier files identified manually, code if time
+#GSE3325 =  FALSE    TRUE
+#                   54675
+
+#GSE2443 =  FALSE    TRUE 
+#            1266   21017 
+
+#GSE32269 = FALSE    TRUE
+#            2301   19982 
+
+#GSE32982 = FALSE    TRUE
+#                    5475
+
+#GSE37199 = FALSE    TRUE
+#                    5475
+
+#GSE28403 = FALSE    TRUE
+#                    5475 
+
+#Processes the data that has FALSE outputs
+GSE2443_filtered <- subset(norm_list[2], idx_thresh_median)
+GSE32269_filtered <- subset(norm_list[3], idx_thresh_median)
+
+#Creates the list of the final normalised data sets
+final_norm_list <- c(GSE3325_norm, GSE2443_filtered[[1]], GSE32269_filtered[[1]], GSE32982_norm, GSE37199_norm, GSE28403_norm)
+
+
+```
+
+```{r}
+#annotation to remove gene with NA volume
+
+#Databases:
+#GSE3325 =  Affymetrix Human Genome U133 Plus 2.0 Array
+#GSE2443 =  Affymetrix Human Genome U133A Array
+#GSE32269 = Affymetrix Human Genome U133A Array
+#GSE32982 = Affymetrix Human Genome U133 Plus 2.0 Array
+#GSE37199 = Affymetrix Human Genome U133 Plus 2.0 Array
+#GSE28403 = Affymetrix Human Genome U133 Plus 2.0 Array)
+
+#Creates list of relevant databases in the correct order
+data_bases <- list(hgu133plus2.db, hgu133a.db, hgu133a.db, hgu133plus2.db, hgu133plus2.db, hgu133plus2.db)
+
+#For each study
+for (j in 1:length(study)){
+  #Assigns name to save each set of annotation data to
+  anno_files <- paste(study[j], '_anno', sep = '')
+  #Extracts the relevant annotation data from the data bases
+  assign(anno_files, AnnotationDbi::select(data_bases[[j]],
+                                           #Extracts the gene names from the finalised data sets
+                                           keys = (featureNames(final_norm_list[j])),
+                                           #Sets the columns of the table to be these data from the annotation data bases
+                                           columns = c("SYMBOL", "GENENAME"),
+                                           #Final annotation data column name
+                                           keytype = "PROBEID"))
+}
+
+#List of all the annotation data sets
+anno_list <- list(GSE3325_anno, GSE2443_anno, GSE32269_anno, GSE32982_anno, GSE37199_anno, GSE28403_anno)
+
+#For each study
+for (k in 1:length(study)){
+  #Create the data for identifying 
+  probe_stats <- anno_list[[k]] %>%
+    #Group by the probe IDs
+    group_by(PROBEID) %>%
+    #Identify number of gene symbols for each ID
+    summarize(no_of_matches = n_distinct(SYMBOL)) %>%
+    #Filter down to just IDs with more than one gene symbol
+    filter(no_of_matches > 1)
+  
+  #Use this list of IDs with more than one gene symbol to create a list of IDs to exclude using TRUE/FALSE
+  ids_to_exlude <- ((featureNames(final_norm_list[k]) %in% probe_stats$PROBEID) |
+                      featureNames(final_norm_list[k])  %in% subset(anno_list[[k]] ,
+                                                                  is.na(SYMBOL))$PROBEID)
+  
+  #Converts this TRUE/FALSE list into a table to view the number of each
+  table(ids_to_exlude)
+  
+  #Assigns the variable name for the data set without the excluded IDs
+  final_files <- paste(study[k], '_final', sep = '')
+  #Filter out the IDs to exclude and assign to the final data set name
+  assign(final_files, subset(final_norm_list[[k]], !ids_to_exlude))
+  }
+
+#Assign these final data sets to a list
+final_list <- c(GSE3325_final, GSE2443_final, GSE32269_final, GSE32982_final, GSE37199_final, GSE28403_final)
+
+#For each study
+for (m in 1:length(study)){
+  #Add the row names to the from the final data to the probe ID section of the final data
+  fData(final_list[[m]])$PROBEID <- rownames(fData(final_list[[m]]))
+  #Adds the annotation data to the final data
+  fData(final_list[[m]]) <- left_join(fData(final_list[[m]]), anno_list[[m]])
+  #Makes the probe ID data into the row names
+  rownames(fData(final_list[[m]])) <-fData(final_list[[m]])$PROBEID
+  #Verifies that the final final data set is a 'valid object'
+  validObject(final_list[[m]])
+}
+```
+
+```{r}
+#Extracts the dates each sample was processed in each data set
+dates_list <- list(final_list[[1]]@protocolData@data[["dates"]], final_list[[2]]@protocolData@data[["dates"]], final_list[[3]]@protocolData@data[["dates"]], final_list[[4]]@protocolData@data[["dates"]], final_list[[5]]@protocolData@data[["dates"]], final_list[[6]]@protocolData@data[["dates"]])
+
+#For each study
+for (o in 1:length(study)){
+  #Split the dates so as to remove the times from the lists
+  dates_split <- sapply(strsplit(dates_list[[o]], split=' ', fixed=TRUE), function(x) (x[1]))
+  #Create a list of unique dates from each list
+  dates_uni <- unique(dates_split)
+  #Create an empty list to add the individual batch values to
+  batch_ind <- list()
+  #Sets a counter to 1
+  p = 1
+  
+  #Create 107 batch values to later assign values to (largest data set had 107 samples)
+  for (q in 1:107){
+    batch_ind <- paste('batch_', q, sep = '')
+    assign(batch_ind, NA)
+  }
+  
+  #For each of the values in the list of dates currently being processed
+  for (r in dates_split){
+    #Re-create the next item in the batch effects list using the counter value
+    batch_ind <- paste('batch_', p, sep = '')
+    #Using the unique dates list, identifies which position the current date in the complete list falls, adds the position number to the letter B, and assigns this to the relevant batch effects list value
+    assign(batch_ind, paste('B', which(dates_uni == r), sep = ''))
+    #Adds one to the counter
+    p = p + 1
+  }
+  
+  #Assigns a name to add all the batch values to
+  batch_files <- paste(study[o], '_batch', sep = '')
+  #Adds all the batch values, including the ones that are still NA to ensure each list gets all values, to the batch values list
+  assign(batch_files, c(batch_1, batch_2, batch_3, batch_4, batch_5, batch_6, batch_7, batch_8, batch_9, batch_10, batch_11, batch_12, batch_13, batch_14, batch_15, batch_16, batch_17, batch_18, batch_19, batch_20, batch_21, batch_22, batch_23, batch_24, batch_25, batch_26, batch_27, batch_28, batch_29, batch_30, batch_31, batch_32, batch_33, batch_34, batch_35, batch_36, batch_37, batch_38, batch_39, batch_40, batch_41, batch_42, batch_43, batch_44, batch_45, batch_46, batch_47, batch_48, batch_49, batch_50, batch_51, batch_52, batch_53, batch_54, batch_55, batch_56, batch_57, batch_58, batch_59, batch_60, batch_61, batch_62, batch_63, batch_64, batch_65, batch_66, batch_67, batch_68, batch_69, batch_70, batch_71, batch_72, batch_73, batch_74, batch_75, batch_76, batch_77, batch_78, batch_79, batch_80, batch_81, batch_82, batch_83, batch_84, batch_85, batch_86, batch_87, batch_88, batch_89, batch_90, batch_91, batch_92, batch_93, batch_94, batch_95, batch_96, batch_97, batch_98, batch_99, batch_100, batch_101, batch_102, batch_103, batch_104, batch_105, batch_106, batch_107))
+}
+
+#Removes the NA values from the batch lists
+GSE3325_batch <- GSE3325_batch[!is.na(GSE3325_batch)]
+GSE2443_batch <- GSE2443_batch[!is.na(GSE2443_batch)]
+GSE32269_batch <- GSE32269_batch[!is.na(GSE32269_batch)]
+GSE32982_batch <- GSE32982_batch[!is.na(GSE32982_batch)]
+GSE37199_batch <- GSE37199_batch[!is.na(GSE37199_batch)]
+GSE28403_batch <- GSE28403_batch[!is.na(GSE28403_batch)]
+
+#Possibly a way to loop the NA removal with assign() or use if statements to not add the NA values to begin with
+
+#Nests all the batch lists to one list
+batch_list <- list(GSE3325_batch, GSE2443_batch, GSE32269_batch, GSE32982_batch, GSE37199_batch, GSE28403_batch)
+
+################################
+### TISSUE BATCH ON GSE28403 ###
+################################
+
+#GSE28403 also uses different tissue types so an additional batch effects filter is created to account for this
+#Creates a list of all the tissue types
+tissue <- GSE28403@phenoData@data[["Tissue"]]
+#Creates a list of unique tissue types
+tissue_uni <- unique(tissue)
+
+#For each of the samples in the GSE28403 study
+for (w in 1:13){
+  #Create a variable to assign each of the tissue batch values to
+  batch_ind <- paste('tissue_', w, sep = '')
+  #Using the unique tissues list, identify which position the current tissue in the complete list falls, adds the position number to the letter B, and assigns this to the relevant batch effects list value
+  assign(batch_ind, paste('B', which(tissue_uni == tissue[w]), sep = ''))
+}
+
+#Add all of the tissue batch values to one list
+tissue_list <- c(tissue_1, tissue_2, tissue_3, tissue_4, tissue_5, tissue_6, tissue_7, tissue_8, tissue_9, tissue_10, tissue_11, tissue_12, tissue_13)
+```
+
+```{r}
+#batch correction using Combat
+#Since the microarray for each sample was performed at different times, this was identified as one of the reasons for the batch effect
+
+#Identifies if no batch effect processing is need on each study due to all the sample dates being the same
+allSame <- function(x) length(unique(x)) == 1
+
+#For each study
+for (u in 1:length(study)){
+  #If all of the samples were done on the same date and therefore no batch effect processing is needed
+  if (allSame(batch_list[[u]])){
+    #Print this information
+    print(paste('No batch correction needed for', study[u]))
+    #Assign the data as is to a filteredb variable name
+    batch_filtered <- paste(study[u], '_filteredb', sep = '')
+    assign(batch_filtered, exprs(final_list[[u]]))
+    #Otherwise (meaning there is a need for batch correction)
+    } else{
+      #Use ComBat to do batch filtering using the generated batch list and assign this to the relevant filteredb variable name
+      batch_filtered <- paste(study[u], '_filteredb', sep = '')
+      assign(batch_filtered, ComBat(dat=exprs(final_list[[u]]), batch=batch_list[[u]]))
+    }
+}
+
+#Re-run the batch filtering on the GSE28403 study for the tissue types
+GSE28403_filteredb <- ComBat(dat=GSE28403_filteredb, batch=tissue_list)
+
+#Add the post batch effects data to a list
+filtered_list <- list(GSE3325_filteredb, GSE2443_filteredb, GSE32269_filteredb, GSE32982_filteredb, GSE37199_filteredb, GSE28403_filteredb)
+
+#For each study
+for(y in 1:length(study)){
+  #Transform the batch effects processed data into a dataframe from a matrix and assign to the relevant dataset variable name
+  data_sets <- paste(study[y], '_dataset', sep = '')  
+  assign(data_sets, as.data.frame(filtered_list[y]))
+}
+
+#Adds all the data frames to a list of data frames
+datasets_list <- list(GSE3325_dataset, GSE2443_dataset, GSE32269_dataset, GSE32982_dataset, GSE37199_dataset, GSE28403_dataset)
+```
+
+```{r}
+#averaging gene expression values for duplicate genes
+
+#For each study
+for (x in 1:length(study)){
+  #Use the final normalised data to ensure the data sets have all the correct gene symbols
+  datasets_list[[x]]$gene <- final_list[[x]]@featureData@data[["SYMBOL"]]
+  #Average any repeats of each gene within each study
+  datasets_list[[x]]<- datasets_list[[x]] %>%
+           group_by(gene) %>%
+           summarise_all(mean)
+  }
+```
+
+```{r}
+#Save all the final normalised, batch corrected and averaged data sets into csv files
+#Empty list of the csv file paths
+csv_file_paths <- list()
+
+#For each item in the list of study names
+for (z in study){
+  #Create a save file path for the data and assign it to the relevant variable name
+  csv_file_paths <- paste('csvfilepath_', z, sep = '')
+  assign(csv_file_paths, paste('Data/count_', z, '.csv', sep = ''))
+}
+
+#Add all of these file paths to one list
+csv_file_path_list <- c(csvfilepath_GSE3325, csvfilepath_GSE2443, csvfilepath_GSE32269, csvfilepath_GSE32982, csvfilepath_GSE37199, csvfilepath_GSE28403)
+
+#For each study
+for (aa in 1:length(study)){
+  #Save the study to the relevant file path
+  write.csv(datasets_list[[aa]], here(csv_file_path_list[aa]), row.names = FALSE)
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
