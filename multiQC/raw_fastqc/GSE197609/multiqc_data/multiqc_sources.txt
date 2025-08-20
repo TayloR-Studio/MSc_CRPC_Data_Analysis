@@ -1,0 +1,17 @@
+Module	Section	Sample Name	Source
+FastQC	all_sections	SRR18170928_1	/storage/caadams/dissertation/fastqc_raw/GSE197609/SRR18170928_1_fastqc.zip
+FastQC	all_sections	SRR18170931_1	/storage/caadams/dissertation/fastqc_raw/GSE197609/SRR18170931_1_fastqc.zip
+FastQC	all_sections	SRR18170929_2	/storage/caadams/dissertation/fastqc_raw/GSE197609/SRR18170929_2_fastqc.zip
+FastQC	all_sections	SRR18170917_1	/storage/caadams/dissertation/fastqc_raw/GSE197609/SRR18170917_1_fastqc.zip
+FastQC	all_sections	SRR18170931_2	/storage/caadams/dissertation/fastqc_raw/GSE197609/SRR18170931_2_fastqc.zip
+FastQC	all_sections	SRR18170930_2	/storage/caadams/dissertation/fastqc_raw/GSE197609/SRR18170930_2_fastqc.zip
+FastQC	all_sections	SRR18170918_1	/storage/caadams/dissertation/fastqc_raw/GSE197609/SRR18170918_1_fastqc.zip
+FastQC	all_sections	SRR18170921_2	/storage/caadams/dissertation/fastqc_raw/GSE197609/SRR18170921_2_fastqc.zip
+FastQC	all_sections	SRR18170928_2	/storage/caadams/dissertation/fastqc_raw/GSE197609/SRR18170928_2_fastqc.zip
+FastQC	all_sections	SRR18170921_1	/storage/caadams/dissertation/fastqc_raw/GSE197609/SRR18170921_1_fastqc.zip
+FastQC	all_sections	SRR18170919_2	/storage/caadams/dissertation/fastqc_raw/GSE197609/SRR18170919_2_fastqc.zip
+FastQC	all_sections	SRR18170917_2	/storage/caadams/dissertation/fastqc_raw/GSE197609/SRR18170917_2_fastqc.zip
+FastQC	all_sections	SRR18170929_1	/storage/caadams/dissertation/fastqc_raw/GSE197609/SRR18170929_1_fastqc.zip
+FastQC	all_sections	SRR18170930_1	/storage/caadams/dissertation/fastqc_raw/GSE197609/SRR18170930_1_fastqc.zip
+FastQC	all_sections	SRR18170919_1	/storage/caadams/dissertation/fastqc_raw/GSE197609/SRR18170919_1_fastqc.zip
+FastQC	all_sections	SRR18170918_2	/storage/caadams/dissertation/fastqc_raw/GSE197609/SRR18170918_2_fastqc.zip

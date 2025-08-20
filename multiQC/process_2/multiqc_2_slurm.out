@@ -1,0 +1,23 @@
+
+  /// MultiQC 🔍 | v1.19
+
+|           multiqc | MultiQC Version v1.30 now available!
+|           multiqc | Search path : /storage/caadams/dissertation/fastqc_process_2/GSE197609
+|         searching | ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 32/32  
+|            fastqc | Found 16 reports
+|           multiqc | Existing reports found, adding suffix to filenames. Use '--force' to overwrite.
+|           multiqc | Report      : ../../multiqc_report/process_2/GSE197609/multiqc_report_1.html
+|           multiqc | Data        : ../../multiqc_report/process_2/GSE197609/multiqc_data_1
+|           multiqc | MultiQC complete
+
+  /// MultiQC 🔍 | v1.19
+
+|           multiqc | MultiQC Version v1.30 now available!
+|           multiqc | Search path : /storage/caadams/dissertation/fastqc_process_2/GSE80609
+|         searching | ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 148/148  
+|            fastqc | Found 74 reports
+|           multiqc | Existing reports found, adding suffix to filenames. Use '--force' to overwrite.
+|           multiqc | Report      : ../../multiqc_report/process_2/GSE80609/multiqc_report_1.html
+|           multiqc | Data        : ../../multiqc_report/process_2/GSE80609/multiqc_data_1
+|           multiqc | MultiQC complete
+MultiQC job done
