@@ -6,7 +6,7 @@ The code in the R folder can be run on R Studio, all required packages are loade
 Bash scripts were designed for a HPC and any required packages were loaded in via bioconda and a conda enviroment at the start of each script
 Python scripts can be run on the HPC using the Bash scripts of the same name
 
-## Usage (View in Raw)
+## Usage
 The workflow is as follows:
 
 	RNASeq pre-processing													Microarray pre-processing
@@ -30,12 +30,12 @@ The workflow is as follows:
 		|											|				    |
 		|											|				    |
 		|											|				    |
-	  fastp_loop_2_GSE80609 ________ process_fastqc_2 ________ multiqc_process_2 __________ combining_contaminants			    |
-	  fastp_loop_2_GSE197609													    |
-		|															    |
-		|															    |
-		|															    |
-		|	      generate_ref_genome											    |
+	  fastp_loop_2_GSE80609 ____________________________________________________________ combining_contaminants			    |
+	  fastp_loop_2_GSE197609					|								    |
+		|							|								    |
+		|							|								    |
+		|	      generate_ref_genome		process_fastqc_2 ________ multiqc_process_2				    |
+		|			|												    |
 		|			|												    |			
 	    align_seq __________________|												    |
 		|															    |
@@ -47,7 +47,7 @@ The workflow is as follows:
 																	    |
 																     Meta_analysis
 
-## Directory structure (View in Raw)
+## Directory structure
 
 Dissertation
 	|
