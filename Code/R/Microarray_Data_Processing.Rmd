@@ -33,9 +33,7 @@ for (a in study){
 }
 ```
 
-#DO NOT RUN AGAIN#
-
-```{r eval=FALSE, include=FALSE}
+```{r}
 #Sets the max time for processes to take before timing out
 options(timeout = max(600, getOption("timeout")))
 
@@ -62,7 +60,7 @@ for (i in study){
   }
 ```
 
-#At this point, filter out the downloaded CEL files based on inclusion/exclusion criteria
+#At this point, filter out the downloaded CEL files based on inclusion/exclusion criteria for samples within each study
 
 ```{r}
 #Empty list for adding the cel files to

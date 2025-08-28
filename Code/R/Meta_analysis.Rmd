@@ -150,7 +150,7 @@ checkDataObject(MetaObj, "Meta", "Pre-Analysis")
 #Does gene symbol correction on the updated meta object
 finalll <- geneSymbolCorrection(MetaObj)
 #Runs the meta analysis on the meta data
-sMetaObj <- runMetaAnalysis(finalll, maxCores = 1) + guides(fill = guide_legend(override.aes = list(shape = 21)))
+sMetaObj <- runMetaAnalysis(finalll, maxCores = 1)
 ```
 
 ```{r}
@@ -170,7 +170,7 @@ file.rename(from = (here('Code/filteredup_meta.csv')), to = (here('Data/filtered
 file.rename(from = (here('Code/filtereddown_meta.csv')), to = (here('Data/filtereddown_meta.csv')))
 ```
 
-```{r}
+```{r fig.height=5, fig.width=10}
 #Sets the max time for processes to take before timing out
 options(timeout = max(600, getOption("timeout")))
 
@@ -186,6 +186,50 @@ for (k in drug_datasets){
   drug_result <- paste('lincsHits_', k, sep = '')
   assign(drug_result, lincsCorrelate(metaObject = h, filterObject = h$filterResults[[1]], dataset = k, direction = "reverse", cor.method = "pearson"))
 }
+```
+
+```{r}
+#####CP#####
+CP_sig_drugs <- lincsHits_CP$hit.list %>% 
+  filter(fdr <= 0.05) %>% 
+  rownames()
+
+lincsHits_CP$hit.expression %>% 
+  dplyr::select(c(-sig, -anti.sig)) %>% 
+  rownames_to_column() %>% 
+  pivot_longer (c("BRDK15916856", "PALBOCICLIB", "BRDK40358966", "BRDK87779281", "BRDK82469231", "BRDK51052187", "BRDK73008154", "CYT387", "BRDK90827020", "MIGLITOL", "BRDK86231656", "HYPEROSIDE", "BRDK97492549", "BRDK01624114", "SA418993", "BRDK93219845", "BRDK03641022", "BRDK74461819", "BRDK45627302", "SA1938820")) %>% 
+  filter(name %in% CP_sig_drugs) %>% 
+  pivot_wider(names_from = name, values_from = value) %>%
+  column_to_rownames('rowname') %>% 
+  colnames()
+
+#####shRNA#####
+SH_sig_drugs <- lincsHits_SH$hit.list %>% 
+  filter(fdr <= 0.05) %>% 
+  rownames()
+
+lincsHits_SH$hit.expression %>% 
+  dplyr::select(c(-sig, -anti.sig)) %>% 
+  rownames_to_column() %>% 
+  pivot_longer (c("HLAB", "PPP4R1", "WARS", "BMP2K", "GUCY2D", "ZMYM2", "PAX8", "C21ORF7", "ETV1", "SPHK1", "COG7", "CDK4", "TLK1", "NFIB", "LOC391295", "PPM1D", "KIAA1804", "DDX10", "PPIE", "CLEC16A")) %>% 
+  filter(name %in% SH_sig_drugs) %>% 
+  pivot_wider(names_from = name, values_from = value) %>%
+  column_to_rownames('rowname') %>% 
+  colnames()
+
+#####LIG#####
+LIG_sig_drugs <- lincsHits_LIG$hit.list %>% 
+  filter(fdr <= 0.05) %>% 
+  rownames()
+
+lincsHits_LIG$hit.expression %>% 
+  dplyr::select(c(-sig, -anti.sig)) %>% 
+  rownames_to_column() %>% 
+  pivot_longer (c("VIP", "NRG1ALPHA", "BNGF", "CHGA", "WISP2", "OXT", "IL12", "CCL3L1", "IFNA", "TGFB2", "SERPINC1", "UTS2", "FGF10", "B2M", "WISP3", "ACHE", "IGFBP3", "TPO", "TNFRSF6B", "NPPA")) %>% 
+  filter(name %in% LIG_sig_drugs) %>% 
+  pivot_wider(names_from = name, values_from = value) %>%
+  column_to_rownames('rowname') %>% 
+  colnames()
 ```
 
 ```{r}
@@ -236,6 +280,63 @@ for (n in 1:length(enriched_plot)){
 plot_list <- list(plot_1, plot_2, plot_3, plot_4, plot_5, plot_6)
 ```
 
+```{r}
+#Pulls in the normalised data that will be used for validation
+studyGSE197609 <- read.csv(here('Data/GSE197609_fpkm_norm_gene_counts.csv.gz')) %>% 
+  #Makes the gene names into the row names
+  column_to_rownames('Gene_ID') %>% 
+  #Filters down to just the samples wanted
+  dplyr::select(c(H.1153640, H.1404067, H.214884, H.2478651, H.3350550, H.3713894, H.6259, H.96144785))
+
+#Pulls in the phenotype data
+phenoGSE197609 <- read_csv(here(paste('Data/GSE197609/GSE197609.csv')))
+
+#Edits the phenotype data so the status is numerical
+phenoGSE197609 <- phenoGSE197609 %>% 
+  mutate(condition = case_when(Status == 'CRPC' ~ 1,
+                               Status == 'hormone_sensitive_PCA' ~ 0))%>% 
+  arrange(desc(ID))
+
+#Pulls the sample names from the phenotype data
+sample_namesGSE197609 <- phenoGSE197609$ID
+
+#Adds these sample names to the expression data so it all matches
+for (o in 1:length(sample_namesGSE197609)){
+  colnames(studyGSE197609)[o] <- sample_namesGSE197609[o]
+  }
+
+#Now the expression data is done being edited, turn it into a matrix
+studyGSE197609 <- as.matrix(studyGSE197609)
+
+#Turn the phenotype data into a data frame so it can have row names
+phenoGSE197609 <- as.data.frame(phenoGSE197609)
+#Move the ID column to the start
+phenoGSE197609 <- relocate(phenoGSE197609, ID)
+#Turn the first column (now the sample IDs) into the row names
+rownames(phenoGSE197609) <- phenoGSE197609[,1]
+#Removes the first column (the IDs)
+phenoGSE197609 <- phenoGSE197609[,-1]
+
+#Setting up an ID data set for the validation data
+
+#Creates a name for the data
+formattedName <- 'Study: GSE197609'
+#Assigns the class as being the numerical data in the phenotype data and the sample names
+class <- setNames(phenoGSE197609$condition, colnames(studyGSE197609))
+#Assigns the count tables to be the expression data
+expr <- studyGSE197609
+#Assigns the phenotype data to be... the phenotype data
+pheno <- phenoGSE197609
+#Pulls the gene symbol row names from the count tables for the gene symbols/keys
+gene_sym <- rownames(studyGSE197609)
+keys <- setNames(gene_sym, rownames(studyGSE197609))
+
+#Creates the ID data set using all of these values assigns it to the relevant variable name
+ID_GSE197609 <- list(formattedName = formattedName, class = class, expr = expr, pheno = pheno, keys = keys)
+
+#Creates the violin plot comparing the meta analysis data set to the validation data set
+violinPlot(leMetaAnalysis$filterResults$FDR0.05_es0_nStudies1_looaFALSE_hetero0, ID_GSE197609, labelColumn = 'Status')
+```
 
 
 

@@ -170,7 +170,7 @@ file.rename(from = (here('Code/filteredup_all.csv')), to = (here('Data/filteredu
 file.rename(from = (here('Code/filtereddown_all.csv')), to = (here('Data/filtereddown_all.csv')))
 ```
 
-```{r}
+```{r fig.height=5, fig.width=10}
 #Sets the max time for processes to take before timing out
 options(timeout = max(600, getOption("timeout")))
 
@@ -186,6 +186,50 @@ for (k in drug_datasets){
   drug_result <- paste('lincsHits_', k, sep = '')
   assign(drug_result, lincsCorrelate(metaObject = h, filterObject = h$filterResults[[1]], dataset = k, direction = "reverse", cor.method = "pearson"))
 }
+```
+
+```{r}
+#####CP#####
+CP_sig_drugs <- lincsHits_CP$hit.list %>% 
+  filter(fdr <= 0.05) %>% 
+  rownames()
+
+lincsHits_CP$hit.expression %>% 
+  dplyr::select(c(-sig, -anti.sig)) %>% 
+  rownames_to_column() %>% 
+  pivot_longer (c("BRDK15916856", "PALBOCICLIB", "BRDK40358966", "BRDK87779281", "BRDK82469231", "BRDK51052187", "BRDK73008154", "CYT387", "BRDK90827020", "MIGLITOL", "BRDK86231656", "HYPEROSIDE", "BRDK97492549", "BRDK01624114", "SA418993", "BRDK93219845", "BRDK03641022", "BRDK74461819", "BRDK45627302", "SA1938820")) %>% 
+  filter(name %in% CP_sig_drugs) %>% 
+  pivot_wider(names_from = name, values_from = value) %>%
+  column_to_rownames('rowname') %>% 
+  colnames()
+
+#####shRNA#####
+SH_sig_drugs <- lincsHits_SH$hit.list %>% 
+  filter(fdr <= 0.05) %>% 
+  rownames()
+
+lincsHits_SH$hit.expression %>% 
+  dplyr::select(c(-sig, -anti.sig)) %>% 
+  rownames_to_column() %>% 
+  pivot_longer (c("HLAB", "PPP4R1", "WARS", "BMP2K", "GUCY2D", "ZMYM2", "PAX8", "C21ORF7", "ETV1", "SPHK1", "COG7", "CDK4", "TLK1", "NFIB", "LOC391295", "PPM1D", "KIAA1804", "DDX10", "PPIE", "CLEC16A")) %>% 
+  filter(name %in% SH_sig_drugs) %>% 
+  pivot_wider(names_from = name, values_from = value) %>%
+  column_to_rownames('rowname') %>% 
+  colnames()
+
+#####LIG#####
+LIG_sig_drugs <- lincsHits_LIG$hit.list %>% 
+  filter(fdr <= 0.05) %>% 
+  rownames()
+
+lincsHits_LIG$hit.expression %>% 
+  dplyr::select(c(-sig, -anti.sig)) %>% 
+  rownames_to_column() %>% 
+  pivot_longer (c("VIP", "NRG1ALPHA", "BNGF", "CHGA", "WISP2", "OXT", "IL12", "CCL3L1", "IFNA", "TGFB2", "SERPINC1", "UTS2", "FGF10", "B2M", "WISP3", "ACHE", "IGFBP3", "TPO", "TNFRSF6B", "NPPA")) %>% 
+  filter(name %in% LIG_sig_drugs) %>% 
+  pivot_wider(names_from = name, values_from = value) %>%
+  column_to_rownames('rowname') %>% 
+  colnames()
 ```
 
 ```{r}
@@ -289,16 +333,10 @@ keys <- setNames(gene_sym, rownames(studyGSE197609))
 
 #Creates the ID data set using all of these values assigns it to the relevant variable name
 ID_GSE197609 <- list(formattedName = formattedName, class = class, expr = expr, pheno = pheno, keys = keys)
-```
 
-
-
-
-```{r}
 #Creates the violin plot comparing the meta analysis data set to the validation data set
 violinPlot(leMetaAnalysis$filterResults$FDR0.05_es0_nStudies1_looaFALSE_hetero0, ID_GSE197609, labelColumn = 'Status')
 ```
-
 
 
 
