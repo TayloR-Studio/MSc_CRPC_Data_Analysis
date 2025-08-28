@@ -1,0 +1,138 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+#Load in needed packages
+library(here)
+library(tidyverse)
+library(readr)
+```
+
+```{r}
+up_micro <- read_csv(here("Data/filteredup_meta.csv")) %>% 
+  pull(x)
+down_micro <- read_csv(here("Data/filtereddown_meta.csv")) %>% 
+  pull(x)
+
+#Combines the previously identified significantly up and down regulated genes into one object
+micro_analysis_genes <- rbind(up_micro, down_micro)
+```
+
+```{r}
+up_all <- read_csv(here("Data/filteredup_all.csv")) %>% 
+  pull(x)
+down_all <- read_csv(here("Data/filtereddown_all.csv")) %>% 
+  pull(x)
+
+#Combines the previously identified significantly up and down regulated genes into one object
+all_analysis_genes <- rbind(up_all, down_all)
+```
+
+```{r}
+#Load in validation study phenotype data
+pheno <- read_csv(here("Data/GSE197609/GSE197609.csv")) %>% 
+  #Adds a column so the disease status is now numeric
+  mutate(Status = case_when(Status == 'CRPC' ~ 1,
+                            Status == 'hormone_sensitive_PCA' ~ 0)) %>% 
+  #Changes the gene names to be the row names
+  column_to_rownames('ID')
+
+#Pulls in the normalised data
+count_matrix <- read_csv(here("Data/GSE197609_fpkm_norm_gene_counts.csv.gz")) %>% 
+  #Converts the gene names to row names
+  column_to_rownames('Gene_ID') %>% 
+  #Selects just the samples wanted for the validation
+  dplyr::select(c('H-1153640', 'H-1404067', 'H-214884', 'H-2478651', 'H-3350550', 'H-3713894', 'H-6259', 'H-96144785'))
+
+#Assigns the row names to be the row names from the phenotype data
+row.names(subset_matrix) <- row.names(pheno)
+
+#Adds the phenotype disease status data to the expression data as a factor data type
+subset_matrix$Status <- as.factor(pheno$Status)
+
+#Ensures the gene names are 'r friendly'
+names(subset_matrix) <- make.names(names(subset_matrix))
+```
+
+
+```{r}
+#Filters the validation data down to just the significant genes
+subset_matrix <- count_matrix[rownames(count_matrix) %in% micro_analysis_genes, ] %>% 
+  #Rotates the table
+  t() %>% 
+  #Turns it into a dataframe
+  as.data.frame()
+
+#Creates an empty list to add the significant results to
+significant_vars <- list()
+
+#Identifies any significant results
+for (a in setdiff(names(subset_matrix), "Status")) {
+  formula <- as.formula(paste("Status ~", a))
+  model <- glm(formula, data = subset_matrix, family = binomial)
+  summary_model <- summary(model)
+
+  p_value <- summary_model$coefficients[2, "Pr(>|z|)"]
+  #Prints the p-values to confirm that none of them seem to be significant (below 0.05)
+  print(paste(p_value, a, sep = '   '))
+
+  if (p_value < 0.05) {
+    cat("\nSignificant variable:", a, "\n")
+    print(summary_model)
+    significant_vars[[a]] <- summary_model
+  }
+}
+```
+
+```{r}
+#Filters the validation data down to just the significant genes
+subset_matrix <- count_matrix[rownames(count_matrix) %in% all_analysis_genes, ] %>% 
+  #Rotates the table
+  t() %>% 
+  #Turns it into a dataframe
+  as.data.frame()
+
+#Creates an empty list to add the significant results to
+significant_vars <- list()
+
+#Identifies any significant results
+for (a in setdiff(names(subset_matrix), "Status")) {
+  formula <- as.formula(paste("Status ~", a))
+  model <- glm(formula, data = subset_matrix, family = binomial)
+  summary_model <- summary(model)
+
+  p_value <- summary_model$coefficients[2, "Pr(>|z|)"]
+  #Prints the p-values to confirm that none of them seem to be significant (below 0.05)
+  print(paste(p_value, a, sep = '   '))
+
+  if (p_value < 0.05) {
+    cat("\nSignificant variable:", a, "\n")
+    print(summary_model)
+    significant_vars[[a]] <- summary_model
+  }
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
