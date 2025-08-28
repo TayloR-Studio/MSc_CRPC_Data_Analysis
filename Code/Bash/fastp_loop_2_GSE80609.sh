@@ -40,7 +40,7 @@ for direct in "${study[@]}"
     #Set the save directory to the base save directory, then the directory for the study
     save_direct="$process_loca""$direct"/
     #Runs the fastp itself, stripping the first 10 bases, removing the overrepresented sequences and setting the per base minimum quality to 25, all as indicated by previous fastqc outputs
-    fastp -w $SLURM_CPUS_PER_TASK -i ${outputname}_1.fastq.gz -I ${outputname}_2.fastq.gz -f 10 -F 10 --adapter_fasta "$adapters"Sequencing_adaptors.fasta -r -M 25 -o "$save_direct"${outputname}_R1_process2.fastq.gz -O "$save_direct"${outputname}_R2_process2.fastq.gz
+    fastp -w $SLURM_CPUS_PER_TASK -i ${outputname}_1.fastq.gz -I ${outputname}_2.fastq.gz -f 10 -F 10 --adapter_fasta "$adapters"all_contaminants.fasta -r -M 25 -o "$save_direct"${outputname}_R1_process2.fastq.gz -O "$save_direct"${outputname}_R2_process2.fastq.gz
    done
   #Step back a directory as was done in the other files just in case this script needs expanding out to more than one study in the future
   cd ..
