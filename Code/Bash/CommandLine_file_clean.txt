@@ -1,0 +1,1 @@
+awk '/^>/ {if (seq && length(seq) > 1) print header "\n" seq; header=$0; seq=""} /^[^>]/ {seq = seq $0} END {if (seq && length(seq) > 1) print header "\n" seq}' contaminants_from_html.fasta > cleaned.fasta
