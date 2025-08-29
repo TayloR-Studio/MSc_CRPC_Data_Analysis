@@ -47,6 +47,10 @@ The workflow is as follows:
 																	    |
 																     Meta_analysis
 
+tree -a -I '.git|node_modules|dist|build|.venv|__pycache__' \
+| sed '1s/^/```text\n/;$a\```' > TREE.md
+
+
 ## Directory structure
 
 Dissertation
